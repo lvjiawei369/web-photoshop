@@ -1,5 +1,6 @@
-import { useStore } from '../state/store'
-import { createCanvas, getCtx, snapshot, clipSelection } from '../core/document'
+import { useStore, type Layer } from '../state/store'
+import { createCanvas, snapshot } from '../core/document'
+import { drawThroughMask } from '../core/selection'
 import type { ToolImpl, ToolContext } from './types'
 
 // Strokes are drawn at full alpha onto a temp canvas, previewed by the
@@ -10,7 +11,7 @@ let strokeCanvas: HTMLCanvasElement | null = null
 let last: { x: number; y: number } | null = null
 let before: ImageData | null = null
 
-function stamp(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, hardness: number) {
+export function stamp(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, hardness: number) {
   const r = size / 2
   if (hardness >= 0.99) {
     ctx.beginPath()
@@ -29,21 +30,36 @@ function stamp(ctx: CanvasRenderingContext2D, x: number, y: number, size: number
   }
 }
 
-function strokeTo(x: number, y: number) {
-  const s = useStore.getState()
-  if (!strokeCanvas || !last) return
-  const ctx = strokeCanvas.getContext('2d')!
-  ctx.fillStyle = s.tool === 'eraser' ? '#000000' : s.fgColor
-  const dx = x - last.x
-  const dy = y - last.y
+/** Walk from `last` to (x,y) calling cb at brush-spacing intervals. Returns new last point. */
+export function interpolate(
+  from: { x: number; y: number },
+  x: number,
+  y: number,
+  size: number,
+  cb: (px: number, py: number) => void
+) {
+  const dx = x - from.x
+  const dy = y - from.y
   const dist = Math.hypot(dx, dy)
-  const step = Math.max(1, s.brushSize / 6)
+  const step = Math.max(1, size / 6)
   const steps = Math.ceil(dist / step)
   for (let i = 1; i <= steps; i++) {
-    stamp(ctx, last.x + (dx * i) / steps, last.y + (dy * i) / steps, s.brushSize, s.brushHardness)
+    cb(from.x + (dx * i) / steps, from.y + (dy * i) / steps)
   }
-  last = { x, y }
-  s.touch()
+}
+
+/** Merge a finished stroke canvas into the layer (through the selection) and record history. */
+export function commitStrokeCanvas(
+  layer: Layer,
+  stroke: HTMLCanvasElement,
+  opacity: number,
+  erase: boolean,
+  label: string,
+  beforeData: ImageData
+) {
+  const s = useStore.getState()
+  drawThroughMask(layer.canvas, stroke, s.selection, { alpha: opacity, erase })
+  s.commitLayerChange(layer.id, beforeData, label)
 }
 
 function makeBrushTool(erase: boolean): ToolImpl {
@@ -63,21 +79,20 @@ function makeBrushTool(erase: boolean): ToolImpl {
       s.touch()
     },
     move(c: ToolContext) {
-      strokeTo(c.x, c.y)
+      const s = useStore.getState()
+      if (!strokeCanvas || !last) return
+      const ctx = strokeCanvas.getContext('2d')!
+      ctx.fillStyle = erase ? '#000000' : s.fgColor
+      interpolate(last, c.x, c.y, s.brushSize, (px, py) => stamp(ctx, px, py, s.brushSize, s.brushHardness))
+      last = { x: c.x, y: c.y }
+      s.touch()
     },
     up() {
       const s = useStore.getState()
       const stroke = s.stroke
       const layer = s.layers.find((l) => l.id === stroke?.layerId)
       if (stroke && layer && before) {
-        const ctx = getCtx(layer.canvas)
-        ctx.save()
-        if (s.selection) clipSelection(ctx, s.selection)
-        ctx.globalAlpha = stroke.opacity
-        ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over'
-        ctx.drawImage(stroke.canvas, 0, 0)
-        ctx.restore()
-        s.commitLayerChange(layer.id, before, stroke.erase ? '橡皮擦' : '画笔')
+        commitStrokeCanvas(layer, stroke.canvas, stroke.opacity, stroke.erase, erase ? '橡皮擦' : '画笔', before)
       }
       strokeCanvas = null
       last = null

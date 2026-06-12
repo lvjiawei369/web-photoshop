@@ -124,6 +124,12 @@ body {
   margin: 4px 0;
 }
 
+.menu-dropdown .menu-header {
+  padding: 4px 16px 2px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 /* ===== Tool options bar ===== */
 .tool-options {
   display: flex;
@@ -385,10 +391,21 @@ body {
 .layers-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   color: var(--text-dim);
+}
+
+.blend-select {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  color: var(--text);
+  border-radius: 2px;
+  padding: 3px 4px;
+  font-size: 12px;
 }
 
 .layers-controls input[type='range'] {
@@ -485,6 +502,58 @@ body {
 
 .layers-footer button:disabled {
   color: #555;
+}
+
+/* ===== History panel ===== */
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 200px;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-item {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.history-item:hover {
+  background: var(--hover);
+}
+
+.history-item.current {
+  background: #4b5562;
+}
+
+.history-item.future {
+  color: #666;
+}
+
+/* ===== Anchor grid (canvas size dialog) ===== */
+.anchor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 22px);
+  gap: 3px;
+}
+
+.anchor-grid button {
+  width: 22px;
+  height: 22px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 2px;
+  cursor: default;
+}
+
+.anchor-grid button.active {
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 /* ===== Status bar ===== */

@@ -1,8 +1,12 @@
 import { useStore, type ToolId } from '../state/store'
 import { snapshot, getCtx } from '../core/document'
 import { flatten } from '../core/compositor'
+import { makeShapeSelection, makeLassoSelection, makeWandSelection } from '../core/selection'
 import { brushTool, eraserTool } from './brush'
 import { fillTool } from './fill'
+import { cloneTool } from './clone'
+import { gradientTool } from './gradient'
+import { shapeTool } from './shapes'
 import type { ToolImpl, ToolContext } from './types'
 
 // --- move ---
@@ -39,34 +43,77 @@ const moveTool: ToolImpl = {
 // --- marquee ---
 function makeMarqueeTool(kind: 'rect' | 'ellipse'): ToolImpl {
   let start: { x: number; y: number } | null = null
-  let dragged = false
+  let rect: { x: number; y: number; w: number; h: number } | null = null
   return {
     cursor: 'crosshair',
     down(c) {
       start = { x: c.x, y: c.y }
-      dragged = false
+      rect = null
     },
     move(c) {
-      if (!start) return
-      dragged = true
-      useStore.getState().set({
-        selection: {
-          kind,
-          x: Math.min(start.x, c.x),
-          y: Math.min(start.y, c.y),
-          w: Math.abs(c.x - start.x),
-          h: Math.abs(c.y - start.y),
-        },
-      })
+      const s = useStore.getState()
+      if (!start || !s.doc) return
+      let x1 = c.x
+      let y1 = c.y
+      if (c.e.shiftKey) {
+        const size = Math.max(Math.abs(c.x - start.x), Math.abs(c.y - start.y))
+        x1 = start.x + Math.sign(c.x - start.x || 1) * size
+        y1 = start.y + Math.sign(c.y - start.y || 1) * size
+      }
+      rect = {
+        x: Math.min(start.x, x1),
+        y: Math.min(start.y, y1),
+        w: Math.abs(x1 - start.x),
+        h: Math.abs(y1 - start.y),
+      }
+      s.set({ selection: makeShapeSelection(kind, rect.x, rect.y, rect.w, rect.h, s.doc.width, s.doc.height) })
     },
     up() {
       const s = useStore.getState()
-      if (!dragged || (s.selection && (s.selection.w < 2 || s.selection.h < 2))) {
-        s.set({ selection: null })
-      }
+      if (!rect || rect.w < 2 || rect.h < 2) s.set({ selection: null })
       start = null
+      rect = null
     },
   }
+}
+
+// --- lasso ---
+let lassoPoints: { x: number; y: number }[] = []
+
+const lassoTool: ToolImpl = {
+  cursor: 'crosshair',
+  down(c) {
+    lassoPoints = [{ x: c.x, y: c.y }]
+    useStore.getState().set({ toolPreview: { kind: 'lasso', points: lassoPoints } })
+  },
+  move(c) {
+    if (!lassoPoints.length) return
+    lassoPoints = [...lassoPoints, { x: c.x, y: c.y }]
+    useStore.getState().set({ toolPreview: { kind: 'lasso', points: lassoPoints } })
+  },
+  up() {
+    const s = useStore.getState()
+    if (s.doc && lassoPoints.length >= 3) {
+      s.set({ selection: makeLassoSelection(lassoPoints, s.doc.width, s.doc.height), toolPreview: null })
+    } else {
+      s.set({ selection: null, toolPreview: null })
+    }
+    lassoPoints = []
+  },
+}
+
+// --- magic wand ---
+const wandTool: ToolImpl = {
+  cursor: 'crosshair',
+  down(c) {
+    const s = useStore.getState()
+    if (!s.doc) return
+    const composite = flatten(s.layers, s.doc.width, s.doc.height)
+    const sel = makeWandSelection(composite, c.x, c.y, s.wandTolerance)
+    s.set({ selection: sel })
+  },
+  move() {},
+  up() {},
 }
 
 // --- crop ---
@@ -113,7 +160,8 @@ const eyedropperTool: ToolImpl = {
     const [r, g, b, a] = getCtx(flat).getImageData(x, y, 1, 1).data
     if (a === 0) return
     const hex = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
-    s.set({ fgColor: hex })
+    if (c.e.altKey) s.set({ bgColor: hex })
+    else s.set({ fgColor: hex })
   },
   move(c) {
     if (c.e.buttons & 1) eyedropperTool.down(c)
@@ -162,6 +210,15 @@ export function zoomStep(direction: 1 | -1) {
   s.set({ zoom: next })
 }
 
+/** Fit the document inside the visible canvas area. */
+export function zoomFit() {
+  const s = useStore.getState()
+  const el = document.querySelector('.canvas-area')
+  if (!s.doc || !el) return
+  const z = Math.min((el.clientWidth - 80) / s.doc.width, (el.clientHeight - 80) / s.doc.height)
+  s.set({ zoom: Math.max(0.02, Math.min(8, z)) })
+}
+
 const zoomTool: ToolImpl = {
   cursor: 'zoom-in',
   down(c) {
@@ -175,11 +232,16 @@ export const TOOLS: Record<ToolId, ToolImpl> = {
   move: moveTool,
   'marquee-rect': makeMarqueeTool('rect'),
   'marquee-ellipse': makeMarqueeTool('ellipse'),
+  lasso: lassoTool,
+  wand: wandTool,
   crop: cropTool,
   eyedropper: eyedropperTool,
   brush: brushTool,
   eraser: eraserTool,
+  clone: cloneTool,
+  gradient: gradientTool,
   fill: fillTool,
+  shape: shapeTool,
   text: textTool,
   hand: handTool,
   zoom: zoomTool,

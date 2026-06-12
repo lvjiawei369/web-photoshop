@@ -16,6 +16,17 @@ const ICONS: Record<ToolId, React.ReactNode> = {
       <ellipse cx="10" cy="10" rx="7" ry="6" strokeDasharray="3 2" />
     </svg>
   ),
+  lasso: (
+    <svg viewBox="0 0 20 20">
+      <path d="M10 3c4 0 7 2 7 4.5S14 12 10 12 3 10 3 7.5 6 3 10 3z" strokeDasharray="3 2" />
+      <path d="M7 11.5c-1 2-1 4 0 5.5M7 17a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+    </svg>
+  ),
+  wand: (
+    <svg viewBox="0 0 20 20">
+      <path d="M11 9l-8 8M13 3v2M17 7h2M16.5 3.5l-1.4 1.4M17.5 10.5l-1.4-1.4M10 4.5l1.4 1.4M13 7l1 1" />
+    </svg>
+  ),
   crop: (
     <svg viewBox="0 0 20 20">
       <path d="M5 2v13h13M2 5h13v13" />
@@ -34,6 +45,23 @@ const ICONS: Record<ToolId, React.ReactNode> = {
   eraser: (
     <svg viewBox="0 0 20 20">
       <path d="M8 16l-4.5-4.5a1 1 0 010-1.4l6.6-6.6a1 1 0 011.4 0l4.5 4.5a1 1 0 010 1.4L10 16H8zM6 8.5L11.5 14M8 16h9" />
+    </svg>
+  ),
+  clone: (
+    <svg viewBox="0 0 20 20">
+      <path d="M7 9h6v8H4V9h3zM7 9c0-4 1.5-6 3-6s3 2 3 6" />
+    </svg>
+  ),
+  gradient: (
+    <svg viewBox="0 0 20 20">
+      <rect x="3" y="5" width="14" height="10" />
+      <path d="M6 5v10M9 5v10M12 5v10" opacity="0.5" />
+    </svg>
+  ),
+  shape: (
+    <svg viewBox="0 0 20 20">
+      <rect x="3" y="3" width="9" height="9" />
+      <circle cx="13.5" cy="13.5" r="4.5" />
     </svg>
   ),
   fill: (
@@ -64,13 +92,18 @@ const GROUPS: { id: ToolId; label: string; key: string }[][] = [
     { id: 'move', label: '移动工具', key: 'V' },
     { id: 'marquee-rect', label: '矩形选框工具', key: 'M' },
     { id: 'marquee-ellipse', label: '椭圆选框工具', key: 'M' },
+    { id: 'lasso', label: '套索工具', key: 'L' },
+    { id: 'wand', label: '魔棒工具', key: 'W' },
     { id: 'crop', label: '裁剪工具', key: 'C' },
     { id: 'eyedropper', label: '吸管工具', key: 'I' },
   ],
   [
     { id: 'brush', label: '画笔工具', key: 'B' },
     { id: 'eraser', label: '橡皮擦工具', key: 'E' },
+    { id: 'clone', label: '仿制图章工具', key: 'S' },
+    { id: 'gradient', label: '渐变工具', key: 'G' },
     { id: 'fill', label: '油漆桶工具', key: 'G' },
+    { id: 'shape', label: '形状工具', key: 'U' },
     { id: 'text', label: '文字工具', key: 'T' },
   ],
   [

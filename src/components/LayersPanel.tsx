@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useStore, type Layer } from '../state/store'
+import { useStore, BLEND_MODES, type Layer, type BlendMode } from '../state/store'
+import { HistoryPanel } from './HistoryPanel'
 
 function Thumb({ layer, rev }: { layer: Layer; rev: number }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -45,8 +46,21 @@ export function LayersPanel() {
 
   return (
     <div className="panels">
+      <HistoryPanel />
       <div className="panel-title">图层</div>
       <div className="layers-controls">
+        <select
+          className="blend-select"
+          disabled={!active}
+          value={active?.blendMode ?? 'source-over'}
+          onChange={(e) => active && setLayerProps(active.id, { blendMode: e.target.value as BlendMode })}
+        >
+          {BLEND_MODES.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
         不透明度
         <input
           type="range"

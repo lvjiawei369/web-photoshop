@@ -1,20 +1,25 @@
 import { useEffect } from 'react'
 import { useStore, loadImageFile, type ToolId } from './state/store'
+import { zoomStep, zoomFit } from './tools'
 import { MenuBar } from './components/MenuBar'
 import { Toolbar } from './components/Toolbar'
 import { ToolOptionsBar } from './components/ToolOptionsBar'
 import { CanvasArea } from './components/CanvasArea'
 import { LayersPanel } from './components/LayersPanel'
-import { NewDocDialog, AdjustDialog } from './components/Dialogs'
+import { NewDocDialog, AdjustDialog, ImageSizeDialog, CanvasSizeDialog } from './components/Dialogs'
 
 const TOOL_KEYS: Record<string, ToolId> = {
   v: 'move',
   m: 'marquee-rect',
+  l: 'lasso',
+  w: 'wand',
   c: 'crop',
   i: 'eyedropper',
   b: 'brush',
   e: 'eraser',
-  g: 'fill',
+  s: 'clone',
+  g: 'gradient',
+  u: 'shape',
   t: 'text',
   h: 'hand',
   z: 'zoom',
@@ -23,7 +28,7 @@ const TOOL_KEYS: Record<string, ToolId> = {
 function App() {
   const doc = useStore((s) => s.doc)
   const zoom = useStore((s) => s.zoom)
-  const showNewDoc = useStore((s) => s.showNewDoc)
+  const dialog = useStore((s) => s.dialog)
   const adjust = useStore((s) => s.adjust)
 
   // global keyboard shortcuts
@@ -33,23 +38,45 @@ function App() {
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
       const s = useStore.getState()
       const mod = e.metaKey || e.ctrlKey
+      const key = e.key.toLowerCase()
 
-      if (mod && e.key.toLowerCase() === 'z') {
-        e.preventDefault()
-        e.shiftKey ? s.redo() : s.undo()
+      if (mod) {
+        if (key === 'z') {
+          e.preventDefault()
+          e.shiftKey ? s.redo() : s.undo()
+        } else if (key === 'a') {
+          e.preventDefault()
+          s.selectAll()
+        } else if (key === 'd') {
+          e.preventDefault()
+          s.deselect()
+        } else if (key === 'i' && e.shiftKey) {
+          e.preventDefault()
+          s.invertSel()
+        } else if (key === 't') {
+          e.preventDefault()
+          s.startTransform()
+        } else if (key === 'e') {
+          e.preventDefault()
+          s.mergeDown()
+        } else if (key === 'n') {
+          e.preventDefault()
+          e.shiftKey ? s.addLayer() : s.set({ dialog: 'new' })
+        } else if (key === '=' || key === '+') {
+          e.preventDefault()
+          zoomStep(1)
+        } else if (key === '-') {
+          e.preventDefault()
+          zoomStep(-1)
+        } else if (key === '0') {
+          e.preventDefault()
+          zoomFit()
+        } else if (key === '1') {
+          e.preventDefault()
+          s.set({ zoom: 1 })
+        }
         return
       }
-      if (mod && e.key.toLowerCase() === 'd') {
-        e.preventDefault()
-        s.deselect()
-        return
-      }
-      if (mod && e.key.toLowerCase() === 'n') {
-        e.preventDefault()
-        e.shiftKey ? s.addLayer() : s.set({ showNewDoc: true })
-        return
-      }
-      if (mod) return
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (s.selection) {
@@ -58,12 +85,14 @@ function App() {
         }
         return
       }
-      if (e.key === 'Enter' && s.cropRect) {
-        s.applyCrop()
+      if (e.key === 'Enter') {
+        if (s.transform) s.applyTransform()
+        else if (s.cropRect) s.applyCrop()
         return
       }
       if (e.key === 'Escape') {
-        s.set({ cropRect: null, selection: null })
+        if (s.transform) s.cancelTransform()
+        else s.set({ cropRect: null, selection: null })
         return
       }
       if (e.key === '[') {
@@ -74,11 +103,10 @@ function App() {
         s.set({ brushSize: Math.min(400, s.brushSize + 5) })
         return
       }
-      if (e.key.toLowerCase() === 'x') {
+      if (key === 'x') {
         s.set({ fgColor: s.bgColor, bgColor: s.fgColor })
         return
       }
-      const key = e.key.toLowerCase()
       if (key === 'm' && s.tool === 'marquee-rect') {
         s.setTool('marquee-ellipse')
         return
@@ -126,7 +154,9 @@ function App() {
         )}
         <span>Web Photoshop — 演示原型</span>
       </div>
-      {showNewDoc && <NewDocDialog />}
+      {dialog === 'new' && <NewDocDialog />}
+      {dialog === 'imageSize' && doc && <ImageSizeDialog />}
+      {dialog === 'canvasSize' && doc && <CanvasSizeDialog />}
       {adjust && <AdjustDialog />}
     </div>
   )

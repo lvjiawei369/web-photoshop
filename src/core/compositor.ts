@@ -1,4 +1,6 @@
 import type { Layer, StrokePreview } from '../state/store'
+import type { TransformState } from './transform'
+import { drawTransformed } from './transform'
 import { createCanvas } from './document'
 
 let checkerPattern: CanvasPattern | null = null
@@ -26,13 +28,7 @@ function getTemp(w: number, h: number): HTMLCanvasElement {
 }
 
 /** Draw one layer merged with an in-progress stroke preview. */
-function drawLayerWithStroke(
-  ctx: CanvasRenderingContext2D,
-  layer: Layer,
-  stroke: StrokePreview,
-  w: number,
-  h: number
-) {
+function layerWithStroke(layer: Layer, stroke: StrokePreview, w: number, h: number): HTMLCanvasElement {
   const t = getTemp(w, h)
   const tctx = t.getContext('2d')!
   tctx.clearRect(0, 0, w, h)
@@ -42,7 +38,16 @@ function drawLayerWithStroke(
   tctx.drawImage(stroke.canvas, 0, 0)
   tctx.globalAlpha = 1
   tctx.globalCompositeOperation = 'source-over'
-  ctx.drawImage(t, 0, 0)
+  return t
+}
+
+/** Render the free-transform preview for a layer. */
+function layerWithTransform(transform: TransformState, w: number, h: number): HTMLCanvasElement {
+  const t = getTemp(w, h)
+  const tctx = t.getContext('2d')!
+  tctx.clearRect(0, 0, w, h)
+  drawTransformed(tctx, transform)
+  return t
 }
 
 /** Composite all visible layers onto the target canvas, with checkerboard background. */
@@ -50,23 +55,29 @@ export function composite(
   target: HTMLCanvasElement,
   layers: Layer[],
   stroke: StrokePreview | null,
+  transform: TransformState | null,
   w: number,
   h: number
 ) {
   const ctx = target.getContext('2d')!
+  ctx.globalCompositeOperation = 'source-over'
   ctx.clearRect(0, 0, w, h)
   ctx.fillStyle = getCheckerPattern(ctx)
   ctx.fillRect(0, 0, w, h)
   for (const layer of layers) {
     if (!layer.visible) continue
     ctx.globalAlpha = layer.opacity
-    if (stroke && stroke.layerId === layer.id) {
-      drawLayerWithStroke(ctx, layer, stroke, w, h)
+    ctx.globalCompositeOperation = layer.blendMode
+    if (transform && transform.layerId === layer.id) {
+      ctx.drawImage(layerWithTransform(transform, w, h), 0, 0)
+    } else if (stroke && stroke.layerId === layer.id) {
+      ctx.drawImage(layerWithStroke(layer, stroke, w, h), 0, 0)
     } else {
       ctx.drawImage(layer.canvas, 0, 0)
     }
   }
   ctx.globalAlpha = 1
+  ctx.globalCompositeOperation = 'source-over'
 }
 
 /** Flatten visible layers to a new canvas (no checkerboard). */
@@ -80,8 +91,10 @@ export function flatten(layers: Layer[], w: number, h: number, background?: stri
   for (const layer of layers) {
     if (!layer.visible) continue
     ctx.globalAlpha = layer.opacity
+    ctx.globalCompositeOperation = layer.blendMode
     ctx.drawImage(layer.canvas, 0, 0)
   }
   ctx.globalAlpha = 1
+  ctx.globalCompositeOperation = 'source-over'
   return c
 }
